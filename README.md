@@ -84,6 +84,28 @@ uv run bdix-check --refresh all               # ignore cached source pages
 uv run bdix-check --cache-dir .cache all
 ```
 
+## Streamlit app (local)
+
+An interactive local UI that leads with **sites that actually open** (OK/redirect, needs login, or FTP-only) and lets you drill into failures and diffs.
+
+```bash
+uv sync
+uv run streamlit run streamlit_app.py
+```
+
+- **Working board:** accessible sites by default, grouped/filterable by ISP, page, tier, FTP status, latency and search. Switch between a styled board and a sortable table. Copy/download working URLs (and Live TV URLs) or export the filtered view.
+- **Snapshots & diff:** each run is saved to `data/runs/<timestamp>.json`; pick a snapshot and see what changed vs the previous one.
+- **Run a check:** probes from *this machine's network* and refreshes the board. Run it from a BDIX-connected connection for meaningful results (cloud hosts will over-report failures).
+
+```text
+streamlit_app.py
+src/bdix_check/app.py      # Streamlit UI
+src/bdix_check/store.py    # run load/save/filter/diff
+src/bdix_check/tiers.py    # bucket → accessibility tier
+.streamlit/config.toml     # dark theme
+data/runs/                 # committed snapshots
+```
+
 | Option | Default | Description |
 |---|---|---|
 | `pages` | `all` | `media`, `livetv`, or `all` |
