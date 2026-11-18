@@ -16,6 +16,7 @@ from .probe import ProbeResult
 
 COLUMNS = [
     "provider",
+    "provider_index",
     "page",
     "kind",
     "url",
@@ -49,7 +50,9 @@ BUCKET_STYLE = {
 
 
 class LiveReporter:
-    def __init__(self, console: Console, filter_kind: str = "server", only_failing: bool = False) -> None:
+    def __init__(
+        self, console: Console, filter_kind: str = "server", only_failing: bool = False
+    ) -> None:
         self.console = console
         self.filter_kind = filter_kind
         self.only_failing = only_failing
@@ -79,7 +82,11 @@ class LiveReporter:
         for r in visible[-40:]:
             bstyle = BUCKET_STYLE.get(r.bucket, "white")
             ftp = r.ftp_status.replace("FTP_", "") if r.ftp_status else "-"
-            note = r.note or (r.ftp_banner or "") or ("private" if r.vantage == "private-range" else "")
+            note = (
+                r.note
+                or (r.ftp_banner or "")
+                or ("private" if r.vantage == "private-range" else "")
+            )
             table.add_row(
                 r.provider[:28],
                 r.kind,
@@ -128,7 +135,9 @@ def append_jsonl(path: Path, result: ProbeResult) -> None:
         f.write(json.dumps(result.to_dict()) + "\n")
 
 
-def print_summary(console: Console, results: list[ProbeResult], filter_kind: str = "server") -> None:
+def print_summary(
+    console: Console, results: list[ProbeResult], filter_kind: str = "server"
+) -> None:
     if filter_kind == "all":
         shown = results
     else:
@@ -139,7 +148,9 @@ def print_summary(console: Console, results: list[ProbeResult], filter_kind: str
     fail = total - ok
 
     lines = [f"Total ({filter_kind}): {total}  |  reachable: {ok}  |  failing: {fail}"]
-    lines.append("Buckets: " + ", ".join(f"{k}={v}" for k, v in sorted(buckets.items(), key=lambda x: -x[1])))
+    lines.append(
+        "Buckets: " + ", ".join(f"{k}={v}" for k, v in sorted(buckets.items(), key=lambda x: -x[1]))
+    )
 
     # FTP alive but http not ok
     ftp_alive = [r for r in shown if r.ftp_status == "FTP_OK" and r.bucket != "OK"]
@@ -159,7 +170,9 @@ def print_summary(console: Console, results: list[ProbeResult], filter_kind: str
         prov_total[r.provider] += 1
         if r.bucket not in ("OK", "REDIRECT"):
             prov_fail[r.provider] += 1
-    worst = sorted(((p, prov_fail[p], prov_total[p]) for p in prov_total), key=lambda x: (-x[1], -x[2]))[:10]
+    worst = sorted(
+        ((p, prov_fail[p], prov_total[p]) for p in prov_total), key=lambda x: (-x[1], -x[2])
+    )[:10]
     if worst and any(w[1] for w in worst):
         t = Table(title="Top providers by failures (shown set)")
         t.add_column("Provider")
@@ -170,7 +183,11 @@ def print_summary(console: Console, results: list[ProbeResult], filter_kind: str
         console.print(t)
 
     # slowest ok
-    slow = sorted([r for r in shown if r.latency_ms and r.bucket == "OK"], key=lambda r: r.latency_ms or 0, reverse=True)[:10]
+    slow = sorted(
+        [r for r in shown if r.latency_ms and r.bucket == "OK"],
+        key=lambda r: r.latency_ms or 0,
+        reverse=True,
+    )[:10]
     if slow:
         t = Table(title="Slowest reachable (HTTP OK)")
         t.add_column("Host")
@@ -184,4 +201,6 @@ def print_summary(console: Console, results: list[ProbeResult], filter_kind: str
         social = [r for r in results if r.kind == "social"]
         if social:
             sok = sum(1 for r in social if r.bucket in ("OK", "REDIRECT"))
-            console.print(f"[dim]Social links probed: {len(social)} total, {sok} reachable, {len(social)-sok} failing (use --filter all to show)[/dim]")
+            console.print(
+                f"[dim]Social links probed: {len(social)} total, {sok} reachable, {len(social) - sok} failing (use --filter all to show)[/dim]"
+            )

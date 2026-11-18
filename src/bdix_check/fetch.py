@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import urllib.parse
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -27,15 +28,65 @@ SOCIAL_HOSTS = {
     "bit.ly",
 }
 
+EMOJI_RE = re.compile(
+    "["
+    "\U0001f1e0-\U0001f1ff"
+    "\U0001f300-\U0001faff"
+    "\U00002700-\U000027bf"
+    "\U00002600-\U000026ff"
+    "\U0001f900-\U0001f9ff"
+    "\U00002b00-\U00002bff"
+    "\u2605\u2b50\ufe0f"
+    "]+",
+    flags=re.UNICODE,
+)
+NUM_PREFIX_RE = re.compile(r"^\s*(\d+)\s*\.\s*")
+TRAILING_SERVER_RE = re.compile(r"(?:\s+FTP)?\s+SERVERS?\s*$", flags=re.IGNORECASE)
+GENERIC_HEADINGS = {
+    "top 50 active servers",
+    "top 50 active",
+    "a-z",
+    "more",
+    "media & ftp servers",
+    "media ftp servers",
+    "live tv servers",
+    "torrent & iptv servers link",
+    "international movie & live tv servers",
+    "bd isp media ftp & live tv servers list link",
+    "bdix & internet speed test",
+}
+
 
 @dataclass(slots=True)
 class Target:
     page: str
     provider: str
+    provider_index: int | None
     url: str
     host: str
     scheme: str
     kind: str  # server | social
+
+
+def clean_provider_name(raw: str | None) -> tuple[int | None, str]:
+    """Return (original_index, cleaned_name) from a raw source heading."""
+    text = (raw or "").strip()
+    if not text:
+        return None, "Unknown"
+
+    # strip emoji/symbols early so leading numbering like "⭐1." is detectable
+    text = EMOJI_RE.sub("", text).strip()
+    m = NUM_PREFIX_RE.match(text)
+    index = int(m.group(1)) if m else None
+
+    text = NUM_PREFIX_RE.sub("", text)
+    text = TRAILING_SERVER_RE.sub("", text)
+    text = " ".join(text.split()).strip(" -:|")
+    text = " ".join(text.split())
+
+    if not text or text.lower() in GENERIC_HEADINGS:
+        return index, "Unknown"
+    return index, text
 
 
 class _PageParser(HTMLParser):
@@ -106,12 +157,13 @@ def parse_targets(html: str, page: str) -> list[Target]:
         if key in seen:
             continue
         seen.add(key)
-        provider = (heading or "Unknown").strip()
+        provider_index, provider = clean_provider_name(heading)
         host = p.hostname
         out.append(
             Target(
                 page=page,
                 provider=provider,
+                provider_index=provider_index,
                 url=url,
                 host=host,
                 scheme=p.scheme,

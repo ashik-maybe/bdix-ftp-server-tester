@@ -212,11 +212,13 @@ def main() -> None:
         max_latency_ms=None if max_lat >= 15000 else max_lat,
         kind="server",
     )
-    # sort: tier order then latency
+    # sort: tier order, original source position, then latency
     filtered = sorted(
         filtered,
         key=lambda r: (
             TIER_ORDER.get(r.get("tier"), 9),
+            r.get("provider_index") if r.get("provider_index") is not None else 10**9,
+            r.get("provider") or "",
             r.get("latency_ms") if r.get("latency_ms") is not None else 10**9,
             r.get("host", ""),
         ),

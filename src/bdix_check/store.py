@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .fetch import clean_provider_name
 from .tiers import enrich, tier_for
 
 RUNS_DIR = Path("data/runs")
@@ -23,7 +24,20 @@ def _row_dict(row: Any) -> dict[str, Any]:
 
 
 def normalize_rows(rows: Iterable[Any]) -> list[dict[str, Any]]:
-    return enrich([_row_dict(r) for r in rows])
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        r = _row_dict(row)
+        raw = r.get("provider")
+        idx, name = clean_provider_name(raw)
+        # keep existing cleaned name if it already looks clean and index is set
+        if r.get("provider_index") is None and idx is not None:
+            r["provider_index"] = idx
+        elif "provider_index" not in r:
+            r["provider_index"] = idx
+        # always normalize display name for consistency/professionalism
+        r["provider"] = name
+        out.append(r)
+    return enrich(out)
 
 
 def save_run(

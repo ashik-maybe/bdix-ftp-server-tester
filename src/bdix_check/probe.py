@@ -15,6 +15,7 @@ from .fetch import Target
 @dataclass(slots=True)
 class ProbeResult:
     provider: str
+    provider_index: int | None
     page: str
     kind: str
     url: str
@@ -65,10 +66,16 @@ def _bucket_for_status(status: int) -> str:
 def _bucket_for_exc(exc: Exception) -> str:
     msg = str(exc).lower()
     name = type(exc).__name__.lower()
-    if isinstance(exc, (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.PoolTimeout, asyncio.TimeoutError)):
+    if isinstance(
+        exc, (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.PoolTimeout, asyncio.TimeoutError)
+    ):
         return "TIMEOUT"
     if isinstance(exc, httpx.ConnectError):
-        if "name or service not known" in msg or "nodename nor servname" in msg or "getaddrinfo" in msg:
+        if (
+            "name or service not known" in msg
+            or "nodename nor servname" in msg
+            or "getaddrinfo" in msg
+        ):
             return "DNS_FAIL"
         if "refused" in msg:
             return "REFUSED"
@@ -89,10 +96,14 @@ async def probe_ftp(host: str, port: int = 21, timeout: float = 3.0) -> tuple[st
         # quick DNS resolve to distinguish
         loop = asyncio.get_running_loop()
         try:
-            await asyncio.wait_for(loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=timeout)
+            await asyncio.wait_for(
+                loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=timeout
+            )
         except socket.gaierror:
             return "FTP_NO_DNS", None
-        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=timeout)
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=timeout
+        )
         try:
             data = await asyncio.wait_for(reader.read(256), timeout=timeout)
             banner = data.decode("utf-8", errors="replace").strip() if data else ""
@@ -133,7 +144,9 @@ async def _http_once(client: httpx.AsyncClient, url: str, method: str) -> httpx.
     return resp
 
 
-async def probe_http(client: httpx.AsyncClient, url: str, timeout: float) -> tuple[int | None, str, int | None, str | None, int, str]:
+async def probe_http(
+    client: httpx.AsyncClient, url: str, timeout: float
+) -> tuple[int | None, str, int | None, str | None, int, str]:
     t0 = time.perf_counter()
     redirects = 0
     try:
@@ -164,12 +177,15 @@ async def probe_target(
     do_ftp: bool,
 ) -> ProbeResult:
     async with sem:
-        http_status, bucket, latency_ms, final_url, redirects, note = await probe_http(client, target.url, timeout)
+        http_status, bucket, latency_ms, final_url, redirects, note = await probe_http(
+            client, target.url, timeout
+        )
         ftp_status, ftp_banner = ("FTP_SKIP", None)
         if do_ftp:
             ftp_status, ftp_banner = await probe_ftp(target.host)
         return ProbeResult(
             provider=target.provider,
+            provider_index=target.provider_index,
             page=target.page,
             kind=target.kind,
             url=target.url,

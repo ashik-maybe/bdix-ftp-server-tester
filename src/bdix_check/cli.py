@@ -108,6 +108,7 @@ async def run(
             except Exception as e:
                 r = ProbeResult(
                     provider=t.provider,
+                    provider_index=t.provider_index,
                     page=t.page,
                     kind=t.kind,
                     url=t.url,
